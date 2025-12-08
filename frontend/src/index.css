@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App background */
+body {
+  @apply bg-slate-100 text-slate-900;
+}
+
+/* General layout wrapper */
+.app-shell {
+  @apply min-h-screen bg-slate-100;
+}
+
+/* Card style */
+.glass {
+  @apply bg-white rounded-xl shadow-md border border-slate-200;
+}
+
+/* Stronger card */
+.glass-strong {
+  @apply bg-white rounded-xl shadow-lg border border-slate-200;
+}
+
+/* Buttons */
+.btn-primary {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 transition;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition;
+}
+
+/* Inputs */
+.input {
+  @apply w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white;
+}
+
+.checkbox {
+  @apply h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500;
+}
+
+/* Task card hover */
+.task-card {
+  @apply transition-transform duration-100 ease-out;
+}
+.task-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Priority badges */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium;
+}
+.badge-high {
+  @apply bg-red-100 text-red-700;
+}
+.badge-medium {
+  @apply bg-amber-100 text-amber-700;
+}
+.badge-low {
+  @apply bg-emerald-100 text-emerald-700;
+}

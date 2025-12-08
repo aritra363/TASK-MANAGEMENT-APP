@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  role            String
+  name            String
+  address         String?
+  dob             DateTime?
+  profileImage    String?
+  username        String   @unique
+  hashedPassword  String
+  managerId       Int?
+  manager         User?    @relation("ManagerEmployees", fields: [managerId], references: [id], onDelete: SetNull)
+  employees       User[]   @relation("ManagerEmployees")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // relations to other models
+  subscriptions   PushSubscription[] @relation("UserSubscriptions")
+  createdTasks    Task[]             @relation("UserCreatedTasks")
+  taskAssignments TaskAssignment[]   @relation("UserAssignments")
+  statusHistories TaskStatusHistory[] @relation("UserStatusHistories")
+}
+
+model Company {
+  id             Int      @id @default(autoincrement())
+  name           String
+  logo           String?
+  // SQLite can’t store String[]; store JSON string instead
+  carouselImages String   @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Task {
+  id            Int      @id @default(autoincrement())
+  title         String
+  description   String?
+  priority      String
+  status        String   @default("TODO")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdById   Int
+  createdBy     User     @relation("UserCreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+
+  completedAt   DateTime?
+  assignments   TaskAssignment[]
+  histories     TaskStatusHistory[]
+}
+
+model TaskAssignment {
+  id           Int      @id @default(autoincrement())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId       Int
+
+  employee     User     @relation("UserAssignments", fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId   Int
+
+  assignedAt   DateTime @default(now())
+  unassignedAt DateTime?
+}
+
+model TaskStatusHistory {
+  id        Int      @id @default(autoincrement())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    Int
+
+  user      User     @relation("UserStatusHistories", fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+
+  fromState String
+  toState   String
+  timestamp DateTime @default(now())
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  endpoint  String   @unique
+  // Json not supported on SQLite – store JSON as a string
+  keys      String
+  createdAt DateTime @default(now())
+}
