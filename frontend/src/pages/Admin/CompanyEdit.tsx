@@ -11,7 +11,8 @@ export default function CompanyEdit() {
   const [company, setCompany] = useState<any>({
     name: "",
     logo: "",
-    carouselImages: []
+    carouselImages: [],
+    bannerText: "Welcome to our company!"
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [carouselPreviews, setCarouselPreviews] = useState<string[]>([]);
@@ -174,16 +175,29 @@ export default function CompanyEdit() {
     }
   };
 
-  const removeCarouselImage = (index: number) => {
-    const newImages = company.carouselImages.filter(
-      (_: string, i: number) => i !== index
-    );
-    const newPreviews = carouselPreviews.filter(
-      (_: string, i: number) => i !== index
-    );
-    setCompany({ ...company, carouselImages: newImages });
-    setCarouselPreviews(newPreviews);
-    toast.info("Image removed from carousel");
+  const removeCarouselImage = async (index: number) => {
+    const imageToRemove = company.carouselImages[index];
+    
+    try {
+      setLoading(true);
+      // Call API to delete the image
+      await api.delete(`/admin/carousel/${encodeURIComponent(imageToRemove)}`);
+      
+      // Remove from state
+      const newImages = company.carouselImages.filter(
+        (_: string, i: number) => i !== index
+      );
+      const newPreviews = carouselPreviews.filter(
+        (_: string, i: number) => i !== index
+      );
+      setCompany({ ...company, carouselImages: newImages });
+      setCarouselPreviews(newPreviews);
+      toast.success("Image removed from carousel");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to remove image");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -213,6 +227,26 @@ export default function CompanyEdit() {
                 )}
                 <p className="text-[11px] text-slate-500 mt-1">
                   5–50 characters recommended
+                </p>
+              </div>
+
+              {/* Banner Text */}
+              <div>
+                <label className="block text-xs font-medium mb-2 text-slate-900">
+                  Banner Text (Running Text)
+                </label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={company.bannerText || ""}
+                  onChange={(e) => {
+                    setCompany({ ...company, bannerText: e.target.value });
+                  }}
+                  placeholder="Enter text to display on running banner"
+                  maxLength={200}
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {(company.bannerText || "").length}/200 characters - This text will scroll continuously on the banner at the top
                 </p>
               </div>
 

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import useToast from "../../hooks/useToast";
+import { useAuth } from "../../context/AuthContext";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_BASE = (import.meta as any).env.VITE_API_URL || "http://localhost:4000";
 
 interface Props {
   role: "ADMIN" | "MANAGER" | "EMPLOYEE";
@@ -13,9 +14,11 @@ interface Props {
 
 export default function Header({ role, title, showBack = true }: Props) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -31,6 +34,20 @@ export default function Header({ role, title, showBack = true }: Props) {
     };
     loadData();
   }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!showDropdown) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDropdown]);
 
   const initials =
     user?.name
@@ -81,8 +98,17 @@ export default function Header({ role, title, showBack = true }: Props) {
           </div>
         </div>
 
-        {/* Right: Profile Icon */}
-        <div className="relative">
+        {/* Right: Profile Icon & User Info */}
+        <div className="relative flex items-center gap-3">
+          {/* User Info */}
+          {user && (
+            <div className="text-right pr-2 border-r border-slate-200">
+              <div className="text-sm font-semibold text-slate-900">{user.name}</div>
+              <div className="text-xs text-slate-500 capitalize">{role.toLowerCase()}</div>
+            </div>
+          )}
+          
+          {/* Avatar */}
           <div
             className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-white text-sm font-semibold cursor-pointer hover:shadow-md transition"
             onClick={() => setShowDropdown(!showDropdown)}
@@ -101,7 +127,10 @@ export default function Header({ role, title, showBack = true }: Props) {
 
           {/* Dropdown Menu */}
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+            <div
+              ref={dropdownRef}
+              className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50"
+            >
               <button
                 onClick={() => {
                   navigate("/profile");
@@ -114,9 +143,9 @@ export default function Header({ role, title, showBack = true }: Props) {
               <button
                 onClick={async () => {
                   try {
-                    await api.post("/auth/logout");
+                    await logout();
                     toast.success("Logged out successfully");
-                    navigate("/login");
+                    navigate("/login", { replace: true });
                   } catch {
                     toast.error("Failed to logout");
                   }

@@ -1,11 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+import { useAuth } from "../context/AuthContext";
 import LoaderOverlay from "../components/LoaderOverlay";
 import useToast from "../hooks/useToast";
 
 type RoleTab = "MANAGER" | "EMPLOYEE";
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { login, user, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<RoleTab>("MANAGER");
 
   const [mgrUser, setMgrUser] = useState("");
@@ -23,19 +27,36 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
+  // Redirect already logged-in users to their dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      if (user.role === "ADMIN") {
+        navigate("/admin", { replace: true });
+      } else if (user.role === "MANAGER") {
+        navigate("/manager", { replace: true });
+      } else {
+        navigate("/employee", { replace: true });
+      }
+    }
+  }, [user, isLoading, navigate]);
+
   const doLogin = async (username: string, password: string, remember: boolean) => {
     setLoading(true);
     try {
       const res = await api.post("/auth/login", { username, password, remember });
-      const role = res.data.user.role;
-      toast.success(`Logged in as ${role.toLowerCase()}`);
+      const userData = res.data.user;
+      toast.success(`Logged in as ${userData.role.toLowerCase()}`);
 
-      if (role === "ADMIN") {
-        window.location.href = "/admin";
-      } else if (role === "MANAGER") {
-        window.location.href = "/manager";
+      // Update auth context
+      login(userData);
+
+      // Navigate based on role
+      if (userData.role === "ADMIN") {
+        navigate("/admin", { replace: true });
+      } else if (userData.role === "MANAGER") {
+        navigate("/manager", { replace: true });
       } else {
-        window.location.href = "/employee";
+        navigate("/employee", { replace: true });
       }
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Login failed");
@@ -66,10 +87,9 @@ export default function Login() {
     if (!validate(adminUser, adminPass)) return;
     doLogin(adminUser, adminPass, false); // admin never remembers
   };
-
   return (
     <div className="app-shell flex flex-col">
-      {loading && <LoaderOverlay message="Signing you in..." />}
+      {(loading || isLoading) && <LoaderOverlay message="Signing you in..." />}
 
       <header className="w-full border-b border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto flex items-center justify-between px-4 py-3">

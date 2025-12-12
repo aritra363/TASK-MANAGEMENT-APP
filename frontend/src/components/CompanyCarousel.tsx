@@ -24,11 +24,12 @@ export default function CompanyCarousel() {
         {images.map((img, idx) => (
           <div
             key={idx}
-            className="h-40 w-56 rounded-lg flex-shrink-0 bg-slate-100 flex items-center justify-center overflow-hidden"
+            className="h-40 w-auto min-w-56 rounded-lg flex-shrink-0 bg-slate-100 flex items-center justify-center overflow-hidden"
           >
             <img
               src={img.startsWith("http") ? img : `${API_BASE}${img}`}
-              className="h-full w-full object-contain"
+              alt={`Carousel ${idx + 1}`}
+              className="h-full w-auto object-scale-down"
             />
           </div>
         ))}

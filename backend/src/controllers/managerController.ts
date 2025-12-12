@@ -31,19 +31,17 @@ export const getManagerBoards = async (req: Request, res: Response) => {
 
 export const getCompletedTasksForManager = async (req: Request, res: Response) => {
   const managerId = Number(req.params.managerId);
-  const { q, date } = req.query;
+  const { q, date, searchType } = req.query;
 
   const employees = await prisma.user.findMany({ where: { managerId } });
   const employeeIds = employees.map((e) => e.id);
 
   const whereAny: any = {
     status: "COMPLETED",
-    assignments: { some: { employeeId: { in: employeeIds } } }
+    assignments: { some: { employeeId: { in: employeeIds }, unassignedAt: null } } // Only currently assigned
   };
 
-  if (q) {
-    whereAny.title = { contains: String(q), mode: "insensitive" };
-  }
+  // Filter by completion date
   if (date) {
     const d = new Date(String(date));
     const start = new Date(d.setHours(0, 0, 0, 0));
@@ -51,7 +49,35 @@ export const getCompletedTasksForManager = async (req: Request, res: Response) =
     whereAny.completedAt = { gte: start, lte: end };
   }
 
-  const tasks = await prisma.task.findMany({ where: whereAny });
+  let tasks = await prisma.task.findMany({
+    where: whereAny,
+    include: {
+      assignments: {
+        where: { unassignedAt: null }, // Only include currently assigned employees
+        include: {
+          employee: true
+        }
+      }
+    },
+    orderBy: { completedAt: "desc" }
+  });
+
+  // Filter by search query in application code (supports both title and employee name)
+  if (q) {
+    const searchValue = String(q).toLowerCase();
+    tasks = tasks.filter((task) => {
+      if (searchType === "employee") {
+        // Search by employee name (only from currently assigned employees)
+        return task.assignments.some((a) =>
+          a.employee?.name.toLowerCase().includes(searchValue)
+        );
+      } else {
+        // Default: search by task title
+        return task.title.toLowerCase().includes(searchValue);
+      }
+    });
+  }
+
   res.json(tasks);
 };
 

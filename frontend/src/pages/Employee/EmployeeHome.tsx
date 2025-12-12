@@ -4,36 +4,51 @@ import GlassCard from "../../components/GlassCard";
 import NotificationStack from "../../components/NotificationStack";
 import Header from "../../components/layout/Header";
 import api from "../../api/api";
+import { socket } from "../../socket/socket";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_BASE = (import.meta as any).env.VITE_API_URL || "http://localhost:4000";
 
 export default function EmployeeHome() {
   const [carousel, setCarousel] = useState<string[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  const loadCarousel = async () => {
+    try {
+      const res = await api.get("/admin/company");
+      const images = res.data.carouselImages || [];
+      const processedImages = images.map((img: string) => {
+        if (img.startsWith("http")) return img;
+        const baseUrl = (import.meta as any).env.VITE_API_URL || "http://localhost:4000";
+        return `${baseUrl}${img}`;
+      });
+      setCarousel(processedImages);
+      setCurrentSlide(0); // Reset to first slide
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get("/admin/company");
-        const images = res.data.carouselImages || [];
-        const processedImages = images.map((img: string) => {
-          if (img.startsWith("http")) return img;
-          const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000";
-          return `${baseUrl}${img}`;
-        });
-        setCarousel(processedImages);
-      } catch {
-        // ignore
-      }
-    })();
+    loadCarousel();
+  }, []);
+
+  // Listen for carousel updates from admin
+  useEffect(() => {
+    socket.on("company_updated", () => {
+      loadCarousel();
+    });
+
+    return () => {
+      socket.off("company_updated");
+    };
   }, []);
 
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % carousel.length);
+    carousel.length > 0 && setCurrentSlide((prev) => (prev + 1) % carousel.length);
   };
 
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + carousel.length) % carousel.length);
+    carousel.length > 0 && setCurrentSlide((prev) => (prev - 1 + carousel.length) % carousel.length);
   };
 
   return (

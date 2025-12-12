@@ -70,14 +70,77 @@ export const updateTask = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const user = (req as any).user;
-    const data: any = req.body;
+    const { title, description, priority, assignedEmployeeIds } = req.body;
+
+    // Verify task exists and belongs to current manager
+    const existingTask = await prisma.task.findUnique({
+      where: { id },
+      include: { assignments: true }
+    });
+
+    if (!existingTask) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (existingTask.createdById !== user.id) {
+      return res.status(403).json({ message: "Forbidden: You can only edit your own tasks" });
+    }
+
+    // Update task basic fields
     const task = await prisma.task.update({
       where: { id },
-      data,
+      data: {
+        title,
+        description,
+        priority
+      },
       include: {
         assignments: { include: { employee: true } }
       }
     });
+
+    // Handle assignment updates if provided
+    if (assignedEmployeeIds && Array.isArray(assignedEmployeeIds)) {
+      const currentAssignedIds = existingTask.assignments
+        .filter(a => !a.unassignedAt) // Only active assignments
+        .map(a => a.employeeId);
+
+      // Remove assignments that are no longer needed
+      const toRemove = currentAssignedIds.filter(id => !assignedEmployeeIds.includes(id));
+      if (toRemove.length > 0) {
+        await prisma.taskAssignment.updateMany({
+          where: {
+            taskId: id,
+            employeeId: { in: toRemove }
+          },
+          data: { unassignedAt: new Date() }
+        });
+      }
+
+      // Add new assignments
+      const toAdd = assignedEmployeeIds.filter(id => !currentAssignedIds.includes(id));
+      for (const empId of toAdd) {
+        await prisma.taskAssignment.create({
+          data: { taskId: id, employeeId: empId }
+        });
+      }
+
+      // Fetch updated task with fresh assignments
+      const updatedTask = await prisma.task.findUnique({
+        where: { id },
+        include: {
+          assignments: { include: { employee: true } }
+        }
+      });
+
+      emitTaskEvent("task_updated", {
+        task: updatedTask,
+        actor: { id: user.id, name: user.name, username: user.username, profileImage: (user as any).profileImage || null },
+        action: `updated task: "${updatedTask?.title}"`
+      });
+      return res.json(updatedTask);
+    }
+
     emitTaskEvent("task_updated", {
       task,
       actor: { id: user.id, name: user.name, username: user.username, profileImage: (user as any).profileImage || null },
@@ -123,6 +186,18 @@ export const assignEmployee = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const { employeeId } = req.body;
     const user = (req as any).user;
+    
+    // First, check if task is completed
+    const existingTask = await prisma.task.findUnique({ where: { id } });
+    
+    // If task is COMPLETED, reset it to TODO when reassigning
+    if (existingTask?.status === "COMPLETED") {
+      await prisma.task.update({
+        where: { id },
+        data: { status: "TODO", completedAt: null }
+      });
+    }
+    
     const a = await prisma.taskAssignment.create({ data: { taskId: id, employeeId } });
     const task = await prisma.task.findUnique({
       where: { id },

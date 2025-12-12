@@ -41,8 +41,27 @@ export default function TaskBoard() {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
+  // Check if a completed task is from today
+  const isCompletedTaskFromToday = (task: any): boolean => {
+    if (task.status !== "COMPLETED" || !task.completedAt) return true;
+    const completedDate = new Date(task.completedAt);
+    const today = new Date();
+    return (
+      completedDate.getFullYear() === today.getFullYear() &&
+      completedDate.getMonth() === today.getMonth() &&
+      completedDate.getDate() === today.getDate()
+    );
+  };
+
   const filterTasks = (cols: Columns, employeeId: number | null) => {
-    if (!employeeId) return cols;
+    if (!employeeId) {
+      // Filter out completed tasks that are not from today
+      return {
+        TODO: cols.TODO,
+        IN_PROGRESS: cols.IN_PROGRESS,
+        COMPLETED: cols.COMPLETED.filter(isCompletedTaskFromToday)
+      };
+    }
     
     return {
       TODO: cols.TODO.filter((t) =>
@@ -52,7 +71,8 @@ export default function TaskBoard() {
         t.assignments?.some((a: any) => a.employeeId === employeeId && !a.unassignedAt)
       ),
       COMPLETED: cols.COMPLETED.filter((t) =>
-        t.assignments?.some((a: any) => a.employeeId === employeeId && !a.unassignedAt)
+        t.assignments?.some((a: any) => a.employeeId === employeeId && !a.unassignedAt) &&
+        isCompletedTaskFromToday(t)
       )
     };
   };
@@ -141,6 +161,25 @@ export default function TaskBoard() {
       // Don't disconnect - keep socket alive for other components
     };
   }, []);
+
+  // Auto-refresh at end of day to remove completed tasks
+  useEffect(() => {
+    const calculateTimeUntilMidnight = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow.getTime() - now.getTime();
+    };
+
+    const timeUntilMidnight = calculateTimeUntilMidnight();
+    const timeoutId = setTimeout(() => {
+      // Refresh board at midnight to filter out old completed tasks
+      if (managerId) fetchBoards(managerId);
+    }, timeUntilMidnight);
+
+    return () => clearTimeout(timeoutId);
+  }, [managerId]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;

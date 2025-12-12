@@ -33,8 +33,9 @@ model Company {
   id             Int      @id @default(autoincrement())
   name           String
   logo           String?
-  // SQLite can’t store String[]; store JSON string instead
+  // SQLite can't store String[]; store JSON string instead
   carouselImages String   @default("[]")
+  bannerText     String   @default("Welcome to our company!")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

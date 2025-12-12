@@ -11,13 +11,38 @@ const urlBase64ToUint8Array = (base64String: string) => {
   return output;
 };
 
+// Clear old service worker caches to fix service worker issues
+const clearOldCaches = async () => {
+  if ("caches" in window) {
+    try {
+      const cacheNames = await caches.keys();
+      // Delete old cache versions
+      await Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== "taskmgt-v1") {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    } catch (err) {
+      console.warn("Failed to clear old caches:", err);
+    }
+  }
+};
+
 export const registerServiceWorkerAndSubscribe = async () => {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     console.warn("Push not supported");
     return;
   }
 
-  const reg = await navigator.serviceWorker.register("/sw.js");
+  // Clear old caches before registering
+  await clearOldCaches();
+
+  const reg = await navigator.serviceWorker.register("/sw.js", {
+    updateViaCache: "none"
+  });
+  
   const r = await api.get("/push/vapidPublicKey");
   const publicKey = r.data.publicKey;
 

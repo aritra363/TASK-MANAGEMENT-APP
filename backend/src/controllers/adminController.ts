@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../db/client";
 import { hashPassword } from "../utils/passwords";
+import { emitTaskEvent } from "../sockets/socket";
 
 /* Create manager */
 export const createManager = async (req: Request, res: Response) => {
@@ -20,6 +21,8 @@ export const createManager = async (req: Request, res: Response) => {
         hashedPassword: hashed
       }
     });
+    // Emit socket event for real-time birthday detection update
+    emitTaskEvent("user_created", { user });
     res.status(201).json(user);
   } catch (e: any) {
     res.status(400).json({ message: e.message });
@@ -45,6 +48,8 @@ export const createEmployee = async (req: Request, res: Response) => {
         managerId: managerId || null
       }
     });
+    // Emit socket event for real-time birthday detection update
+    emitTaskEvent("user_created", { user });
     res.status(201).json(user);
   } catch (e: any) {
     res.status(400).json({ message: e.message });
@@ -79,6 +84,8 @@ export const updateManager = async (req: Request, res: Response) => {
   const data: any = req.body;
   if (data.dob) data.dob = new Date(data.dob);
   const updated = await prisma.user.update({ where: { id }, data });
+  // Emit socket event for real-time birthday detection update
+  emitTaskEvent("user_updated", { user: updated });
   res.json(updated);
 };
 
@@ -106,7 +113,7 @@ export const getCompany = async (_req: Request, res: Response) => {
 };
 
 export const updateCompany = async (req: Request, res: Response) => {
-  const { name, logo, carouselImages } = req.body; // carouselImages expected as array
+  const { name, logo, carouselImages, bannerText } = req.body; // carouselImages expected as array
   let c = await prisma.company.findFirst();
 
   const carouselString = JSON.stringify(carouselImages || []);
@@ -116,15 +123,27 @@ export const updateCompany = async (req: Request, res: Response) => {
       data: {
         name: name || "My Company",
         logo: logo || null,
-        carouselImages: carouselString
+        carouselImages: carouselString,
+        bannerText: bannerText || "Welcome to our company!"
       }
     });
   } else {
     c = await prisma.company.update({
       where: { id: c.id },
-      data: { name, logo, carouselImages: carouselString }
+      data: { 
+        name, 
+        logo, 
+        carouselImages: carouselString,
+        bannerText: bannerText || c.bannerText
+      }
     });
   }
+
+  // Emit real-time update event
+  emitTaskEvent("company_updated", {
+    company: { ...c, carouselImages },
+    bannerText: c.bannerText
+  });
 
   res.json({ ...c, carouselImages });
 };
@@ -142,6 +161,8 @@ export const updateUser = async (req: Request, res: Response) => {
     if (body.dob) body.dob = new Date(body.dob);
 
     const updated = await prisma.user.update({ where: { id }, data: body });
+    // Emit socket event for real-time birthday detection update
+    emitTaskEvent("user_updated", { user: updated });
     res.json(updated);
   } catch (e: any) {
     res.status(400).json({ message: e.message });

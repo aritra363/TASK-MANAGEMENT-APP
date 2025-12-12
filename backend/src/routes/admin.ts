@@ -12,16 +12,18 @@ const router = Router();
 router.get("/company", authMiddleware, adminController.getCompany);
 router.put("/company", authMiddleware, requireRole("ADMIN"), adminController.updateCompany);
 
+// Get managers and employees for birthday banner - accessible to all authenticated users
+router.get("/managers", authMiddleware, adminController.listManagers);
+router.get("/employees", authMiddleware, adminController.listEmployees);
+
 // All other admin routes require authenticated ADMIN
 router.use(authMiddleware, requireRole("ADMIN"));
 
 // Manager & employee CRUD
-router.get("/managers", adminController.listManagers);
 router.post("/managers", adminController.createManager);
 router.put("/managers/:id", adminController.updateManager);
 router.delete("/users/:id", adminController.deleteUser);
 
-router.get("/employees", adminController.listEmployees);
 router.post("/employees", adminController.createEmployee);
 
 // Manager with employees
@@ -137,6 +139,59 @@ router.post("/upload/profile/:userId", upload.single("profile"), async (req: any
     });
 
     res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Delete carousel image
+router.delete("/carousel/:imagePath", async (req: any, res) => {
+  try {
+    const imagePath = decodeURIComponent(req.params.imagePath);
+
+    // Get current company
+    let c = await prisma.company.findFirst();
+    if (!c) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
+    // Parse carousel images
+    let carousel: string[] = [];
+    try {
+      if (c.carouselImages) carousel = JSON.parse(c.carouselImages);
+    } catch {
+      carousel = [];
+    }
+
+    // Remove the image from array
+    const filtered = carousel.filter((img: string) => img !== imagePath);
+
+    // Update database
+    c = await prisma.company.update({
+      where: { id: c.id },
+      data: { carouselImages: JSON.stringify(filtered) }
+    });
+
+    // Delete file from disk
+    try {
+      const filename = imagePath.split("/").pop();
+      const filepath = path.join(__dirname, "..", "..", "uploads", "carousel", filename || "");
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+    } catch (e) {
+      // File already deleted or doesn't exist, continue
+    }
+
+    // Parse and return
+    let finalArray: string[] = [];
+    try {
+      finalArray = JSON.parse(c.carouselImages);
+    } catch {
+      finalArray = [];
+    }
+
+    res.json({ ...c, carouselImages: finalArray });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }

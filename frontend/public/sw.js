@@ -55,24 +55,38 @@ self.addEventListener("activate", function (event) {
 
 // Fetch handler for offline support
 self.addEventListener("fetch", function (event) {
+  const url = event.request.url;
+
   // Only handle GET requests
   if (event.request.method !== "GET") {
     return;
   }
 
-  // Skip API calls
-  if (event.request.url.includes("/api/") || event.request.url.includes("/auth/")) {
+  // Skip all API calls, Socket.io, and authentication requests
+  if (
+    url.includes("/api/") ||
+    url.includes("/auth/") ||
+    url.includes("/socket.io/") ||
+    url.includes("/manager/") ||
+    url.includes("/employee/") ||
+    url.includes("/admin/") ||
+    url.includes("/tasks/")
+  ) {
     return;
   }
 
-  // Simple network-first strategy for static assets
+  // Simple network-first strategy for static assets only
   event.respondWith(
     fetch(event.request)
       .then((response) => {
+        // Only cache successful responses
+        if (!response || response.status !== 200) {
+          return response;
+        }
         return response;
       })
       .catch(() => {
-        // Offline fallback
+        // Offline fallback - only for static assets
         return caches.match(event.request);
       })
   );
